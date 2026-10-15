@@ -173,7 +173,17 @@ def focus_guard():
             if foreground != hwnd:
 
                 if is_recovering:
+
                     restart_recovery.set()
+
+                    try:
+                        win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(hwnd)
+                    except:
+                        pass
+
+                    real_sleep(0.5)
+
                     continue
 
                 temphouse = houses_claimed
