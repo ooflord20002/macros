@@ -228,6 +228,44 @@ def focus_guard():
     try:
         while not stop_event.is_set():
 
+            if restart_requested.is_set():
+
+                temphouse = houses_claimed
+
+                app.after(
+                    0,
+                    lambda: status_label.configure(
+                        text="Status: Resetting",
+                        text_color="yellow"
+                    )
+                )
+
+                recovery_macro()
+
+                if stop_event.is_set():
+                    return
+
+                restart_count += 1
+
+                app.after(
+                    0,
+                    lambda: restarts_label.configure(
+                        text=f"Restarts: {restart_count}"
+                    )
+                )
+
+                restart_requested.clear()
+
+                macro_thread = threading.Thread(
+                    target=macro,
+                    daemon=True
+                )
+
+                macro_thread.start()
+
+                continue
+
+
             hwnd = get_roblox_window()
 
             if hwnd:
