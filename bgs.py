@@ -68,6 +68,11 @@ restart_requested = threading.Event()
 
 focus_thread = None
 
+houses_claimed = 0
+restart_count = 0
+runtime_seconds = 0
+is_running = False
+
 def check_restart():
     
     if restart_requested.is_set():
@@ -563,10 +568,29 @@ def macro():
             traceback.print_exc()
             return
 
+def update_runtime():
+    global runtime_seconds
+
+    if is_running:
+
+        runtime_seconds += 1
+
+        hours = runtime_seconds // 3600
+        minutes = (runtime_seconds % 3600) // 60
+        seconds = runtime_seconds % 60
+
+        runtime_label.configure(
+            text=f"Runtime: {hours:02}:{minutes:02}:{seconds:02}"
+        )
+
+    app.after(1000, update_runtime)
 
 def start():
     global macro_thread
     global focus_thread
+    global is_running
+
+    is_running = True
 
     if macro_thread is None or not macro_thread.is_alive():
 
@@ -592,6 +616,10 @@ def start():
 
 
 def stop():
+
+    global is_running
+
+    is_running = False
 
     stop_event.set()
 
@@ -699,4 +727,13 @@ restarts_label = ctk.CTkLabel(
 
 restarts_label.pack(pady=(5, 15))
 
+runtime_label = ctk.CTkLabel(
+    stats_frame,
+    text="Runtime: 00:00:00",
+    font=("Arial", 20, "bold")
+)
+
+runtime_label.pack(pady=(5, 15))
+
+update_runtime()
 app.mainloop()
