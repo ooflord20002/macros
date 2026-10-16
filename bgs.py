@@ -125,6 +125,11 @@ def recovery_check():
 def recovery_macro():
     global is_recovering
 
+    if runslower.get():
+        mult = 1.7
+    else:
+        mult = 1
+
     is_recovering = True
 
     try:
@@ -141,36 +146,36 @@ def recovery_macro():
             if recovery_check():
                 continue
             pydirectinput.press('esc')
-            real_sleep(0.5)
+            real_sleep(0.5*mult)
             if recovery_check():
                 continue
             pydirectinput.press('r')
-            real_sleep(0.5)
+            real_sleep(0.5*mult)
             if recovery_check():
                 continue
             pydirectinput.press('enter')
-            real_sleep(7)
+            real_sleep(7*mult)
             if recovery_check():
                 continue
             pydirectinput.keyDown('w')
-            real_sleep(2)
+            real_sleep(2*mult)
             if recovery_check():
                 continue
             pydirectinput.keyDown('d')
-            real_sleep(0.4)
+            real_sleep(0.4*mult)
             if recovery_check():
                 continue
             pydirectinput.keyUp('d')
             pydirectinput.keyUp('w')
-            real_sleep(0.25)
+            real_sleep(0.25*mult)
             if recovery_check():
                 continue
             pydirectinput.keyDown('d')
-            real_sleep(1.9)
+            real_sleep(1.9*mult)
             if recovery_check():
                 continue
             pydirectinput.keyUp('d')
-            real_sleep(0.25)
+            real_sleep(0.25*mult)
             if recovery_check():
                 continue
 
@@ -354,12 +359,13 @@ def focus_guard():
         traceback.print_exc()
 
 def interruptible_sleep(seconds):
+    global runslower
 
     if stop_event.is_set():
         raise SystemExit()
 
-    if runslower():
-        howlong = seconds * 1.8
+    if runslower.get():
+        howlong = seconds * 1.74
     else:
         howlong = seconds
 
@@ -412,11 +418,17 @@ def macro():
             pydirectinput.keyDown('d')
             interruptible_sleep(0.9)
             pydirectinput.keyDown('w')
-            interruptible_sleep(0.06)
+            if runslower.get():
+                interruptible_sleep(0.12)
+            else:
+                interruptible_sleep(0.06)
             pydirectinput.keyUp('w')
             interruptible_sleep(0.08)
             pydirectinput.keyDown('w')
-            interruptible_sleep(0.07)
+            if runslower.get():
+                interruptible_sleep(0.12)
+            else:
+                interruptible_sleep(0.07)
             pydirectinput.keyUp('w')
             interruptible_sleep(1.55)
             pydirectinput.keyUp('d')
@@ -752,12 +764,12 @@ checkbox = ctk.CTkCheckBox(
 
 checkbox.pack(pady=(20, 10))
 
-runslower = checkbox = ctk.CTkCheckBox(
+runslower = ctk.CTkCheckBox(
     control_frame,
     text=("Toggle to run slower, if no 2x run gamepass")
 )
 
-checkbox.pack(pady=(20, 10))
+runslower.pack(pady=(20, 10))
 
 status_label = ctk.CTkLabel(
     control_frame,
