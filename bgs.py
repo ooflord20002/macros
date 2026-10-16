@@ -7,6 +7,10 @@ import win32gui
 import traceback
 import win32con
 from PIL import ImageGrab
+import faulthandler
+
+fault_log = open("crash.log", "w")
+faulthandler.enable(fault_log)
 
 def add_house():
     global houses_claimed
@@ -200,6 +204,7 @@ def recovery_macro():
     except Exception:
         traceback.print_exc()
 
+
     finally:
         is_recovering = False
 
@@ -304,6 +309,9 @@ def focus_guard():
 
             real_sleep(0.05)
 
+    except SystemExit:
+        return
+
     except Exception:
         traceback.print_exc()
 
@@ -335,12 +343,12 @@ def macro():
             pydirectinput.keyUp('s')
             interruptible_sleep(0.25)
             pydirectinput.keyDown('a')
-            interruptible_sleep(0.9)
+            interruptible_sleep(0.95)
             pydirectinput.keyUp('a')
             interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('d')
-            interruptible_sleep(1.2)
+            interruptible_sleep(1.25)
             pydirectinput.keyUp('d')
             interruptible_sleep(0.25)
             pydirectinput.keyDown('w')
@@ -735,5 +743,12 @@ runtime_label = ctk.CTkLabel(
 
 runtime_label.pack(pady=(5, 15))
 
-update_runtime()
-app.mainloop()
+try:
+    update_runtime()
+    app.mainloop()
+
+except SystemExit:
+    print("Main thread caught SystemExit")
+
+except Exception:
+    traceback.print_exc()
