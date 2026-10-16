@@ -365,7 +365,7 @@ def interruptible_sleep(seconds):
         raise SystemExit()
 
     if runslower.get():
-        howlong = seconds * 1.74
+        howlong = seconds * 1.765
     else:
         howlong = seconds
 
