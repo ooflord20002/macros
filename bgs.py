@@ -358,10 +358,12 @@ def interruptible_sleep(seconds):
     if stop_event.is_set():
         raise SystemExit()
 
-    real_sleep(seconds)
+    if runslower():
+        howlong = seconds * 2
+    else:
+        howlong = seconds
 
-    if runslower.get():
-        real_sleep(seconds)
+    real_sleep(howlong)
 
     if stop_event.is_set():
         raise SystemExit()
