@@ -4,18 +4,33 @@ import threading
 import keyboard
 import time
 import win32gui
+import traceback
 import win32con
 from PIL import ImageGrab
 
 def add_house():
     global houses_claimed
+
     houses_claimed += 1
-    houses_label.configure(text=f"Houses Claimed: ~{houses_claimed}")
+
+    app.after(
+        0,
+        lambda: houses_label.configure(
+            text=f"Houses Claimed: ~{houses_claimed}"
+        )
+    )
 
 def is_black(rgb, tolerance=25):
     r, g, b = rgb
     return r <= tolerance and g <= tolerance and b <= tolerance
 
+def roblox_has_focus():
+    hwnd = get_roblox_window()
+
+    if not hwnd:
+        return False
+
+    return hwnd == win32gui.GetForegroundWindow()
 
 def corners_are_black():
     hwnd = get_roblox_window()
@@ -51,12 +66,12 @@ real_sleep = time.sleep
 
 restart_requested = threading.Event()
 
-restart_recovery = threading.Event()
-
 focus_thread = None
 
 def check_restart():
+    
     if restart_requested.is_set():
+        print("restart requested")
 
         pydirectinput.keyUp('w')
         pydirectinput.keyUp('a')
@@ -64,6 +79,39 @@ def check_restart():
         pydirectinput.keyUp('d')
 
         raise SystemExit
+
+def refocus_roblox():
+    hwnd = get_roblox_window()
+
+    if hwnd:
+        try:
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            win32gui.SetForegroundWindow(hwnd)
+            return True
+        except:
+            pass
+
+    return False
+
+def recovery_check():
+
+    if stop_event.is_set():
+        raise SystemExit()
+
+    if not roblox_has_focus():
+
+        release_movement_keys()
+
+        print("Lost focus during recovery")
+
+        refocus_roblox()
+
+        real_sleep(1)
+
+        return True
+
+    return False
+
 
 def recovery_macro():
     global is_recovering
@@ -73,61 +121,63 @@ def recovery_macro():
     try:
         while True:
 
-            restart_recovery.clear()
+            if stop_event.is_set():
+                    return
+
+            refocus_roblox()
+
             release_movement_keys()
 
-            time.sleep(4)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(4)
+            if recovery_check():
                 continue
             pydirectinput.press('esc')
-            time.sleep(0.5)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(0.5)
+            if recovery_check():
                 continue
             pydirectinput.press('r')
-            time.sleep(0.5)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(0.5)
+            if recovery_check():
                 continue
             pydirectinput.press('enter')
-            time.sleep(7)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(7)
+            if recovery_check():
                 continue
             pydirectinput.keyDown('w')
-            time.sleep(2)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(2)
+            if recovery_check():
                 continue
             pydirectinput.keyDown('d')
-            time.sleep(0.4)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(0.4)
+            if recovery_check():
                 continue
             pydirectinput.keyUp('d')
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(0.25)
+            if recovery_check():
                 continue
             pydirectinput.keyDown('d')
-            time.sleep(1.9)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(1.9)
+            if recovery_check():
                 continue
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
-            if restart_recovery.is_set():
-                release_movement_keys()
+            real_sleep(0.25)
+            if recovery_check():
                 continue
 
             press_count = 0
 
             while not corners_are_black():
 
+                if stop_event.is_set():
+                    return
+
+                if recovery_check():
+                    break
+
                 pydirectinput.press('s')
-                time.sleep(0.25)
+
+                real_sleep(0.25)
 
                 press_count += 1
 
@@ -135,12 +185,15 @@ def recovery_macro():
                     release_movement_keys()
                     break
 
-            if restart_recovery.is_set():
-                continue
-
             if corners_are_black():
-                time.sleep(5)
+                real_sleep(5)
                 return
+    except SystemExit:
+        print("Recovery stopped")
+        return
+
+    except Exception:
+        traceback.print_exc()
 
     finally:
         is_recovering = False
@@ -162,19 +215,33 @@ def focus_guard():
     global restart_count
     global houses_claimed
 
-    while not stop_event.is_set():
+    try:
+        while not stop_event.is_set():
 
-        hwnd = get_roblox_window()
+            hwnd = get_roblox_window()
 
-        if hwnd:
+            if hwnd:
 
-            foreground = win32gui.GetForegroundWindow()
+                foreground = win32gui.GetForegroundWindow()
 
-            if foreground != hwnd:
+                if foreground != hwnd:
 
-                if is_recovering:
+                    if is_recovering:
 
-                    restart_recovery.set()
+                        refocus_roblox()
+
+                        real_sleep(0.5)
+
+                        continue
+
+                    temphouse = houses_claimed
+
+                    restart_requested.set()
+
+                    print("Waiting for macro thread...")
+                    if macro_thread and macro_thread.is_alive():
+                        macro_thread.join(timeout=2)
+                    print("Done waiting")
 
                     try:
                         win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
@@ -182,305 +249,318 @@ def focus_guard():
                     except:
                         pass
 
-                    real_sleep(0.5)
+                    real_sleep(1)
 
-                    continue
-
-                temphouse = houses_claimed
-
-                restart_requested.set()
-
-                if macro_thread and macro_thread.is_alive():
-                    macro_thread.join(timeout=2)
-
-                try:
-                    win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                    win32gui.SetForegroundWindow(hwnd)
-                except:
-                    pass
-
-                real_sleep(1)
-
-                status_label.configure(
-                        text="Status: Resetting",
-                        text_color="yellow"
+                    app.after(
+                        0,
+                        lambda: status_label.configure(
+                            text="Status: Resetting",
+                            text_color="yellow"
+                        )
                     )
 
-                recovery_macro()
+                    recovery_macro()
+                    if stop_event.is_set():
+                        return
 
-                restart_count += 1
+                    restart_count += 1
 
-                restarts_label.configure(text=f"Restarts: {restart_count}")
-
-                restart_requested.clear()
-
-                macro_thread = threading.Thread(
-                    target=macro,
-                    daemon=True
-                )
-
-                status_label.configure(
-                        text="Status: Running",
-                        text_color="green"
+                    app.after(
+                        0,
+                        lambda: restarts_label.configure(
+                            text=f"Restarts: {restart_count}"
+                        )
                     )
 
-                houses_claimed = temphouse
-                houses_label.configure(text=f"Houses Claimed: ~{houses_claimed}")
+                    restart_requested.clear()
 
-                macro_thread.start()
+                    macro_thread = threading.Thread(
+                        target=macro,
+                        daemon=True
+                    )
 
-        real_sleep(0.05)
+                    app.after(
+                        0,
+                        lambda: status_label.configure(
+                            text="Status: Running",
+                            text_color="green"
+                        )
+                    )
+
+                    houses_claimed = temphouse
+                    app.after(
+                        0,
+                        lambda: houses_label.configure(
+                            text=f"Houses Claimed: ~{houses_claimed}"
+                        )
+                    )
+
+                    macro_thread.start()
+
+            real_sleep(0.05)
+
+    except Exception:
+        traceback.print_exc()
 
 def interruptible_sleep(seconds):
-    if stop_event.wait(seconds):
-        raise SystemExit
 
-time.sleep = interruptible_sleep
+    if stop_event.is_set():
+        raise SystemExit()
+
+    real_sleep(seconds)
+
+    if stop_event.is_set():
+        raise SystemExit()
 
 def macro():
     while True:
         try:
             #MainArea
             pydirectinput.keyDown('w')
-            time.sleep(0.45)
+            interruptible_sleep(0.45)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('d')
-            time.sleep(0.5)
+            interruptible_sleep(0.5)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('s')
-            time.sleep(1.15)
+            interruptible_sleep(1.15)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('a')
-            time.sleep(0.9)
+            interruptible_sleep(0.9)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('d')
-            time.sleep(1.2)
+            interruptible_sleep(1.2)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('w')
-            time.sleep(1)
+            interruptible_sleep(1)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Bridge1
             pydirectinput.keyDown('d')
-            time.sleep(0.9)
+            interruptible_sleep(0.9)
             pydirectinput.keyDown('w')
-            time.sleep(0.06)
+            interruptible_sleep(0.06)
             pydirectinput.keyUp('w')
-            time.sleep(0.08)
+            interruptible_sleep(0.08)
             pydirectinput.keyDown('w')
-            time.sleep(0.07)
+            interruptible_sleep(0.07)
             pydirectinput.keyUp('w')
-            time.sleep(1.55)
+            interruptible_sleep(1.55)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             check_restart()
         
             #NeighborHood1
             pydirectinput.keyDown('w')
-            time.sleep(0.5)
+            interruptible_sleep(0.5)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('d')
-            time.sleep(0.35)
+            interruptible_sleep(0.35)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('a')
-            time.sleep(0.4)
+            interruptible_sleep(0.4)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('w')
-            time.sleep(0.5)
+            interruptible_sleep(0.5)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('s')
-            time.sleep(1)
+            interruptible_sleep(1)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #ReturnBridge1
             pydirectinput.keyDown('a')
-            time.sleep(1.3)
+            interruptible_sleep(1.3)
             pydirectinput.keyDown('s')
-            time.sleep(0.1)
+            interruptible_sleep(0.1)
             pydirectinput.keyUp('s')
-            time.sleep(0.07)
+            interruptible_sleep(0.07)
             pydirectinput.keyDown('s')
-            time.sleep(0.1)
+            interruptible_sleep(0.1)
             pydirectinput.keyUp('s')
-            time.sleep(1)
+            interruptible_sleep(1)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #MainArea Into Shop Area
             pydirectinput.keyDown('s')
-            time.sleep(1)
+            interruptible_sleep(1)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('a')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('s')
-            time.sleep(3.05)
+            interruptible_sleep(3.05)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Shop Area Into Bride3 Towards Neighborhood2
             pydirectinput.keyDown('d')
-            time.sleep(3)
+            interruptible_sleep(3)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Neighborhood2
             pydirectinput.keyDown('s')
-            time.sleep(0.5)
+            interruptible_sleep(0.5)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('w')
-            time.sleep(0.3)
+            interruptible_sleep(0.3)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('d')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('a')
-            time.sleep(0.3)
+            interruptible_sleep(0.3)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('w')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('s')
-            time.sleep(0.4)
+            interruptible_sleep(0.4)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Neighborhood2 Back To Shop Area
             pydirectinput.keyDown('a')
-            time.sleep(3.47)
+            interruptible_sleep(3.47)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Shop Area To Neighborhood 3
             pydirectinput.keyDown('s')
-            time.sleep(2.85)
+            interruptible_sleep(2.85)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Neighborhood3
             pydirectinput.keyDown('a')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('d')
-            time.sleep(0.3)
+            interruptible_sleep(0.3)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('s')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('s')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('w')
-            time.sleep(0.2)
+            interruptible_sleep(0.2)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('d')
-            time.sleep(0.7)
+            interruptible_sleep(0.7)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             add_house()
             pydirectinput.keyDown('a')
-            time.sleep(0.4)
+            interruptible_sleep(0.4)
             pydirectinput.keyUp('a')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             check_restart()
         
             #Return To Main Areaa
             pydirectinput.keyDown('w')
-            time.sleep(3.1)
+            interruptible_sleep(3.1)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('d')
-            time.sleep(0.05)
+            interruptible_sleep(0.05)
             pydirectinput.keyUp('d')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('w')
-            time.sleep(4.3)
+            interruptible_sleep(4.3)
             pydirectinput.keyUp('w')
-            time.sleep(0.25)
+            interruptible_sleep(0.25)
             pydirectinput.keyDown('a')
-            time.sleep(0.6)
+            interruptible_sleep(0.6)
             pydirectinput.keyUp('a')
-            time.sleep(5)
+            interruptible_sleep(5)
             check_restart()
 
             if checkbox.get():
                 #Last Island Than Return
                 pydirectinput.keyDown('s')
-                time.sleep(0.5)
+                interruptible_sleep(0.5)
                 pydirectinput.keyUp('s')
-                time.sleep(0.25)
+                interruptible_sleep(0.25)
                 pydirectinput.keyDown('a')
-                time.sleep(1.85)
+                interruptible_sleep(1.85)
                 pydirectinput.keyUp('a')
-                time.sleep(4)
+                interruptible_sleep(4)
                 pydirectinput.keyDown('w')
-                time.sleep(0.05)
+                interruptible_sleep(0.05)
                 pydirectinput.keyUp('w')
-                time.sleep(4)
+                interruptible_sleep(4)
                 pydirectinput.keyDown('d')
-                time.sleep(0.9)
+                interruptible_sleep(0.9)
                 pydirectinput.keyUp('d')
-                time.sleep(0.25)
+                interruptible_sleep(0.25)
                 pydirectinput.keyDown('w')
-                time.sleep(0.2)
+                interruptible_sleep(0.2)
                 pydirectinput.keyUp('w')
-                time.sleep(0.25)
+                interruptible_sleep(0.25)
                 pydirectinput.keyDown('d')
-                time.sleep(1.3)
+                interruptible_sleep(1.3)
                 pydirectinput.keyUp('d')
-                time.sleep(0.25)
+                interruptible_sleep(0.25)
                 pydirectinput.keyDown('w')
-                time.sleep(0.45)
+                interruptible_sleep(0.45)
                 pydirectinput.keyUp('w')
-                time.sleep(5)
+                interruptible_sleep(5)
                 check_restart()
             else:
                 pydirectinput.keyDown('d')
                 pydirectinput.keyDown('w')
-                time.sleep(0.2)
+                interruptible_sleep(0.2)
                 pydirectinput.keyUp('w')
-                time.sleep(0.25)
+                interruptible_sleep(0.25)
                 pydirectinput.keyUp('d')
-                time.sleep(5)
+                interruptible_sleep(5)
                 check_restart()
         except SystemExit:
+            print("SystemExit caught")
+            return
+
+        except Exception:
+            traceback.print_exc()
             return
 
 
@@ -512,11 +592,22 @@ def start():
 
 
 def stop():
+
     stop_event.set()
 
-    status_label.configure(
-        text="Status: Stopped",
-        text_color="red"
+    restart_requested.clear()
+
+    release_movement_keys()
+
+    global is_recovering
+    is_recovering = False
+
+    app.after(
+        0,
+        lambda: status_label.configure(
+            text="Status: Stopped",
+            text_color="red"
+        )
     )
 
 keyboard.add_hotkey("f1", start)
