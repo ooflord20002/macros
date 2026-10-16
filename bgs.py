@@ -325,6 +325,14 @@ def interruptible_sleep(seconds):
     if stop_event.is_set():
         raise SystemExit()
 
+def require_alignment():
+
+    if not corners_are_black():
+
+        restart_requested.set()
+
+        raise SystemExit()
+
 def macro():
     while True:
         try:
@@ -525,7 +533,9 @@ def macro():
             pydirectinput.keyDown('a')
             interruptible_sleep(0.6)
             pydirectinput.keyUp('a')
-            interruptible_sleep(5)
+            interruptible_sleep(1.3)
+            require_alignment()
+            interruptible_sleep(3.7)
             check_restart()
 
             if checkbox.get():
@@ -557,7 +567,9 @@ def macro():
                 pydirectinput.keyDown('w')
                 interruptible_sleep(0.45)
                 pydirectinput.keyUp('w')
-                interruptible_sleep(5)
+                interruptible_sleep(1.3)
+                require_alignment()
+                interruptible_sleep(3.7)
                 check_restart()
             else:
                 pydirectinput.keyDown('d')
