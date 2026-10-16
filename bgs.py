@@ -573,6 +573,7 @@ def macro():
             pydirectinput.keyUp('a')
             interruptible_sleep(1.3)
             require_alignment()
+            check_restart()
             interruptible_sleep(3.7)
             check_restart()
 
@@ -607,8 +608,8 @@ def macro():
                 pydirectinput.keyUp('w')
                 interruptible_sleep(1.3)
                 require_alignment()
-                interruptible_sleep(3.7)
                 check_restart()
+                interruptible_sleep(3.7)
             else:
                 pydirectinput.keyDown('d')
                 pydirectinput.keyDown('w')
