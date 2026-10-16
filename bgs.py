@@ -360,6 +360,9 @@ def interruptible_sleep(seconds):
 
     real_sleep(seconds)
 
+    if runslower.get():
+        real_sleep(seconds)
+
     if stop_event.is_set():
         raise SystemExit()
 
@@ -743,6 +746,13 @@ checkbox = ctk.CTkCheckBox(
         "Toggle for extra alignment thingy that wastes a ton of time "
         "after each run but might make you more straight I think"
     )
+)
+
+checkbox.pack(pady=(20, 10))
+
+runslower = checkbox = ctk.CTkCheckBox(
+    control_frame,
+    text=("Toggle to run slower, if no 2x run gamepass")
 )
 
 checkbox.pack(pady=(20, 10))
