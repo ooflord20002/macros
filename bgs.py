@@ -380,6 +380,16 @@ def require_alignment():
 def macro():
     while True:
         try:
+
+            if status_label.cget('text') == 'Resetting':
+                app.after(
+                    0,
+                    lambda: status_label.configure(
+                    text="Status: Running",
+                    text_color="green"
+                )
+            )
+
             if runslower.get():
                 #main1
                 pydirectinput.keyDown('d')
