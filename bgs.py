@@ -1,3 +1,5 @@
+# Bubble Gum Simulator 2026 Trick Or Treat Macro
+
 import pydirectinput
 import customtkinter as ctk
 import threading
